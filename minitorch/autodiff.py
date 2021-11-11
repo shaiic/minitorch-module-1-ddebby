@@ -191,7 +191,8 @@ class History:
             list of numbers : a derivative with respect to `inputs`
         """
         # TODO: Implement for Task 1.4.
-        raise NotImplementedError('Need to implement for Task 1.4')
+        res = self.last_fn.chain_rule(self.ctx, self.inputs, d_output)
+        return res
 
 
 class FunctionBase:
@@ -274,7 +275,8 @@ class FunctionBase:
         # Tip: Note when implementing this function that
         # cls.backward may return either a value or a tuple.
         # TODO: Implement for Task 1.3.
-        raise NotImplementedError('Need to implement for Task 1.3')
+        deriv = cls.backward(ctx, d_output)
+        return [(x, y) for x, y in zip(inputs, wrap_tuple(deriv)) if not is_constant(x)]
 
 
 # Algorithms for backpropagation
@@ -296,7 +298,25 @@ def topological_sort(variable):
                             starting from the right.
     """
     # TODO: Implement for Task 1.4.
-    raise NotImplementedError('Need to implement for Task 1.4')
+    #
+    # depth-first search algorithm? or breath-first search ? I think breath-first search is better
+    # As Scalar is unhashbale, we need store the the id in another set
+    # 保证leaf节点之前的节点都出现在前面，所以depth-first更实用；
+    order = []
+    seen = set()
+
+    def visit(var):
+        if var.unique_id in seen:
+            return
+        if not var.is_leaf():
+            for m in var.history.inputs:
+                if not is_constant(m):
+                    visit(m)
+        seen.add(var.unique_id)
+        order.insert(0, var)
+
+    visit(variable)
+    return order
 
 
 def backpropagate(variable, deriv):
@@ -313,4 +333,18 @@ def backpropagate(variable, deriv):
     No return. Should write to its results to the derivative values of each leaf through `accumulate_derivative`.
     """
     # TODO: Implement for Task 1.4.
-    raise NotImplementedError('Need to implement for Task 1.4')
+    nodes = topological_sort(variable)
+
+    dict = {v.unique_id: 0 for v in nodes}
+    dict[variable.unique_id] = deriv
+
+    for var in nodes:
+        if var.is_leaf():
+            var.accumulate_derivative(dict[var.unique_id])
+        else:
+            for v_, deriv_ in var.history.backprop_step(dict[var.unique_id]):
+                if v_.unique_id in dict:
+                    dict[v_.unique_id] += deriv_
+                else:
+                    dict[v_.unique_id] = deriv_
+    # raise NotImplementedError('Need to implement for Task 1.4')
